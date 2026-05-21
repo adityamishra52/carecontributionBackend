@@ -7,7 +7,7 @@ export function sendSuccess(res, data = null, message = "Request successful", st
 }
 
 export function normalizeApiPayload(body, statusCode = 200) {
-  if (body && typeof body === "object" && "success" in body && "message" in body) {
+  if (body && typeof body === "object" && "success" in body) {
     return body;
   }
 

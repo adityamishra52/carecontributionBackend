@@ -73,6 +73,7 @@ export const uploadGalleryImage = asyncHandler(async (req, res) => {
 
   return res.status(201).json({
     success: true,
+    message: "Image uploaded successfully",
     image: toPublicGalleryImage(savedImage, true),
   });
 });
@@ -88,6 +89,7 @@ export const getGalleryImages = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
+    message: "Gallery images fetched successfully",
     images: Array.isArray(images) ? images.map(toPublicGalleryImage) : [],
   });
 });
