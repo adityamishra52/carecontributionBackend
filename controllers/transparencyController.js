@@ -3,9 +3,41 @@ import { SiteSetting } from "../models/SiteSetting.js";
 import { TransparencyReport } from "../models/TransparencyReport.js";
 
 const publicSettingFields =
-  "upiId qrImageUrl qrImageMimeType qrImageFilename qrImageSize paymentInstructions disclaimer createdAt updatedAt";
+  "upiId qrImageUrl qrImageMimeType qrImageFilename qrImageSize paymentInstructions impactStats disclaimer createdAt updatedAt";
 
 const settingsQrImageUrl = "/api/transparency/settings/qr-image";
+const defaultImpactStats = [
+  { label: "Meals Distributed", value: 320 },
+  { label: "Animals Helped", value: 248 },
+  { label: "Trees Planted", value: 140 },
+  { label: "Families Supported", value: 72 },
+  { label: "Support Tracked", value: 54 },
+];
+
+function normalizeImpactStats(value) {
+  let parsed = value;
+
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      parsed = [];
+    }
+  }
+
+  if (!Array.isArray(parsed)) {
+    return defaultImpactStats;
+  }
+
+  const stats = parsed
+    .map((item) => ({
+      label: String(item?.label || "").trim(),
+      value: Math.max(0, Number(item?.value || 0)),
+    }))
+    .filter((item) => item.label);
+
+  return stats.length ? stats.slice(0, 8) : defaultImpactStats;
+}
 
 function toPublicSiteSetting(setting) {
   if (!setting) return null;
@@ -14,7 +46,13 @@ function toPublicSiteSetting(setting) {
     typeof setting.toObject === "function" ? setting.toObject() : setting;
   const { qrImageData, ...publicSetting } = value;
 
-  return publicSetting;
+  return {
+    ...publicSetting,
+    impactStats:
+      Array.isArray(publicSetting.impactStats) && publicSetting.impactStats.length
+        ? publicSetting.impactStats
+        : defaultImpactStats,
+  };
 }
 
 export const createReport = asyncHandler(async (req, res) => {
@@ -88,6 +126,10 @@ export const saveSiteSetting = asyncHandler(async (req, res) => {
     payload.disclaimer = req.body.disclaimer.trim();
   }
 
+  if (req.body.impactStats !== undefined) {
+    payload.impactStats = normalizeImpactStats(req.body.impactStats);
+  }
+
   if (typeof req.body.qrImageUrl === "string" && req.body.qrImageUrl.trim()) {
     payload.qrImageUrl = req.body.qrImageUrl.trim();
   }
@@ -126,6 +168,7 @@ export const getSiteSetting = asyncHandler(async (req, res) => {
     upiId: process.env.UPI_ID || "carecontribution@upi",
     qrImageUrl: undefined,
     paymentInstructions: undefined,
+    impactStats: defaultImpactStats,
     disclaimer: "This is a personal community support initiative, not a registered NGO.",
   };
 
