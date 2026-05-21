@@ -68,7 +68,8 @@ export const uploadGalleryImage = asyncHandler(async (req, res) => {
     size: image.imageSize,
   });
 
-  const savedImage = await GalleryImage.findById(image._id);
+  // Fetch with imageData included (it has select: false by default)
+  const savedImage = await GalleryImage.findById(image._id).select("+imageData");
 
   return res.status(201).json({
     success: true,
