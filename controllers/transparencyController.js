@@ -44,6 +44,35 @@ export const deleteReport = asyncHandler(async (req, res) => {
   res.json({ message: "report deleted" });
 });
 
+export const updateReport = asyncHandler(async (req, res) => {
+  const payload = { ...req.body };
+
+  if (req.file) {
+    payload.imageUrl = `/uploads/${req.file.filename}`;
+  }
+
+  if (payload.totalSupportReceived !== undefined) {
+    payload.totalSupportReceived = Number(payload.totalSupportReceived || 0);
+  }
+
+  if (payload.totalSupportUsed !== undefined) {
+    payload.totalSupportUsed = Number(payload.totalSupportUsed || 0);
+  }
+
+  const updated = await TransparencyReport.findByIdAndUpdate(
+    req.params.id,
+    payload,
+    { new: true, runValidators: true }
+  );
+
+  if (!updated) {
+    res.status(404);
+    throw new Error("report not found");
+  }
+
+  res.json(updated);
+});
+
 export const saveSiteSetting = asyncHandler(async (req, res) => {
   const payload = {};
 
