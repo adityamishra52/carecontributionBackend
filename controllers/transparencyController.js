@@ -6,6 +6,7 @@ const publicSettingFields =
   "upiId qrImageUrl qrImageMimeType qrImageFilename qrImageSize paymentInstructions impactStats disclaimer createdAt updatedAt";
 
 const settingsQrImageUrl = "/api/transparency/settings/qr-image";
+const reportImageUrl = (id) => `/api/transparency/reports/${id}/image`;
 const defaultImpactStats = [
   { label: "Meals Distributed", value: 320 },
   { label: "Animals Helped", value: 248 },
@@ -55,19 +56,35 @@ function toPublicSiteSetting(setting) {
   };
 }
 
+function toPublicReport(report) {
+  if (!report) return null;
+  const value = typeof report.toObject === "function" ? report.toObject() : report;
+  const { imageData, ...publicReport } = value;
+
+  if (value.imageData?.length) {
+    publicReport.imageUrl = reportImageUrl(value._id);
+  }
+
+  return publicReport;
+}
+
 export const createReport = asyncHandler(async (req, res) => {
   const payload = { ...req.body };
   if (req.file) {
-    payload.imageUrl = `/uploads/${req.file.filename}`;
+    payload.imageData = req.file.buffer;
+    payload.imageMimeType = req.file.mimetype;
+    payload.imageFilename = req.file.originalname;
+    payload.imageSize = req.file.size;
   }
-  const report = await TransparencyReport.create(payload);
-  res.status(201).json(report);
+  const created = await TransparencyReport.create(payload);
+  const report = await TransparencyReport.findById(created._id).select("+imageData");
+  res.status(201).json(toPublicReport(report));
 });
 
 export const getReports = asyncHandler(async (req, res) => {
   try {
-    const reports = await TransparencyReport.find().sort({ createdAt: -1 });
-    res.json(Array.isArray(reports) ? reports : []);
+    const reports = await TransparencyReport.find().select("+imageData").sort({ createdAt: -1 });
+    res.json(Array.isArray(reports) ? reports.map(toPublicReport) : []);
   } catch {
     res.json([]);
   }
@@ -86,7 +103,10 @@ export const updateReport = asyncHandler(async (req, res) => {
   const payload = { ...req.body };
 
   if (req.file) {
-    payload.imageUrl = `/uploads/${req.file.filename}`;
+    payload.imageData = req.file.buffer;
+    payload.imageMimeType = req.file.mimetype;
+    payload.imageFilename = req.file.originalname;
+    payload.imageSize = req.file.size;
   }
 
   if (payload.totalSupportReceived !== undefined) {
@@ -101,14 +121,30 @@ export const updateReport = asyncHandler(async (req, res) => {
     req.params.id,
     payload,
     { new: true, runValidators: true }
-  );
+  ).select("+imageData");
 
   if (!updated) {
     res.status(404);
     throw new Error("report not found");
   }
 
-  res.json(updated);
+  res.json(toPublicReport(updated));
+});
+
+export const getReportImage = asyncHandler(async (req, res) => {
+  const report = await TransparencyReport.findById(req.params.id).select(
+    "+imageData imageMimeType updatedAt"
+  );
+
+  if (!report || !report.imageData?.length) {
+    res.status(404);
+    throw new Error("report image not found");
+  }
+
+  res.set("Cache-Control", "public, max-age=31536000, immutable");
+  res.set("Vary", "Origin");
+  res.contentType(report.imageMimeType || "application/octet-stream");
+  res.send(report.imageData);
 });
 
 export const saveSiteSetting = asyncHandler(async (req, res) => {

@@ -6,6 +6,10 @@ const testimonialSchema = new mongoose.Schema(
     content: { type: String, required: true, trim: true },
     role: { type: String, trim: true },
     avatarUrl: { type: String, trim: true },
+    avatarData: { type: Buffer, select: false },
+    avatarMimeType: { type: String, trim: true },
+    avatarFilename: { type: String, trim: true },
+    avatarSize: { type: Number, min: 0 },
   },
   { timestamps: true }
 );
