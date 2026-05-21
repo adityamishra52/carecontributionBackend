@@ -8,7 +8,7 @@ function buildGalleryImageUrl(id) {
   return `/api/gallery/${id}/image`;
 }
 
-function toPublicGalleryImage(image) {
+function toPublicGalleryImage(image, includeBase64 = false) {
   if (!image) return null;
 
   const value = typeof image.toObject === "function" ? image.toObject() : image;
@@ -16,6 +16,12 @@ function toPublicGalleryImage(image) {
 
   if (!publicImage.imageUrl && publicImage._id) {
     publicImage.imageUrl = buildGalleryImageUrl(publicImage._id);
+  }
+
+  // Include base64 data URI if requested and data is available
+  if (includeBase64 && imageData && publicImage.imageMimeType) {
+    const base64 = imageData.toString("base64");
+    publicImage.imageUrl = `data:${publicImage.imageMimeType};base64,${base64}`;
   }
 
   return publicImage;
@@ -34,11 +40,10 @@ export const uploadGalleryImage = asyncHandler(async (req, res) => {
     fileType: req.file?.mimetype,
   });
 
-  if (!req.file && !req.body.imageUrl) {
+  if (!req.file) {
     return res.status(400).json({
       success: false,
       message: "Image file is required",
-      data: null,
     });
   }
 
@@ -46,30 +51,28 @@ export const uploadGalleryImage = asyncHandler(async (req, res) => {
     title,
     category,
     caption,
-    imageUrl: req.file ? "/api/gallery/pending/image" : req.body.imageUrl.trim(),
-    imageData: req.file?.buffer,
-    imageMimeType: req.file?.mimetype,
-    imageFilename: req.file?.originalname,
-    imageSize: req.file?.size,
+    imageUrl: `/api/gallery/pending/image`,
+    imageData: req.file.buffer,
+    imageMimeType: req.file.mimetype,
+    imageFilename: req.file.originalname,
+    imageSize: req.file.size,
   });
 
-  if (req.file) {
-    image.imageUrl = buildGalleryImageUrl(image._id);
-    await image.save();
-    console.debug("[GalleryController] updateGalleryImageUrl", {
-      id: image._id,
-      imageUrl: image.imageUrl,
-    });
-  }
+  // Update URL to include the actual ID
+  image.imageUrl = buildGalleryImageUrl(image._id);
+  await image.save();
+  
+  console.debug("[GalleryController] uploadGalleryImage success", {
+    id: image._id,
+    imageUrl: image.imageUrl,
+    size: image.imageSize,
+  });
 
-  const savedImage = await GalleryImage.findById(image._id).select(
-    publicGalleryFields
-  );
+  const savedImage = await GalleryImage.findById(image._id);
 
   return res.status(201).json({
     success: true,
-    message: "Image uploaded successfully",
-    data: toPublicGalleryImage(savedImage),
+    image: toPublicGalleryImage(savedImage, true),
   });
 });
 
@@ -84,7 +87,7 @@ export const getGalleryImages = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    data: Array.isArray(images) ? images.map(toPublicGalleryImage) : [],
+    images: Array.isArray(images) ? images.map(toPublicGalleryImage) : [],
   });
 });
 
@@ -101,7 +104,6 @@ export const getGalleryImageById = asyncHandler(async (req, res) => {
     return res.status(404).json({
       success: false,
       message: "Image not found",
-      data: null,
     });
   }
 
@@ -134,10 +136,6 @@ export const updateGalleryImage = asyncHandler(async (req, res) => {
     payload.caption = req.body.caption.trim();
   }
 
-  if (typeof req.body.imageUrl === "string" && req.body.imageUrl.trim()) {
-    payload.imageUrl = req.body.imageUrl.trim();
-  }
-
   if (req.file) {
     payload.imageUrl = buildGalleryImageUrl(req.params.id);
     payload.imageData = req.file.buffer;
@@ -164,14 +162,13 @@ export const updateGalleryImage = asyncHandler(async (req, res) => {
     return res.status(404).json({
       success: false,
       message: "Image not found",
-      data: null,
     });
   }
 
   return res.status(200).json({
     success: true,
     message: "Image updated successfully",
-    data: toPublicGalleryImage(updated),
+    image: toPublicGalleryImage(updated),
   });
 });
 
@@ -187,13 +184,11 @@ export const deleteGalleryImage = asyncHandler(async (req, res) => {
     return res.status(404).json({
       success: false,
       message: "Image not found",
-      data: null,
     });
   }
 
   return res.status(200).json({
     success: true,
     message: "Image deleted successfully",
-    data: { id: deleted._id },
   });
 });
