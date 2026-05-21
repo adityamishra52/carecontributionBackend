@@ -44,6 +44,13 @@ const galleryImageSchema = new mongoose.Schema(
       min: 0,
     },
 
+    thumbnailFit: {
+      type: String,
+      enum: ["contain", "cover"],
+      default: "contain",
+      trim: true,
+    },
+
     caption: {
       type: String,
       trim: true,

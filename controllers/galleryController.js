@@ -2,7 +2,7 @@ import { asyncHandler } from "../middleware/asyncHandler.js";
 import { GalleryImage } from "../models/GalleryImage.js";
 
 const publicGalleryFields =
-  "title category imageUrl imageMimeType imageFilename imageSize caption createdAt updatedAt";
+  "title category imageUrl imageMimeType imageFilename imageSize thumbnailFit caption createdAt updatedAt";
 
 function buildGalleryImageUrl(id) {
   return `/api/gallery/${id}/image`;
@@ -31,11 +31,13 @@ export const uploadGalleryImage = asyncHandler(async (req, res) => {
   const title = req.body.title?.trim() || "Untitled image";
   const category = req.body.category?.trim() || "general";
   const caption = req.body.caption?.trim() || "";
+  const thumbnailFit = req.body.thumbnailFit === "cover" ? "cover" : "contain";
 
   console.debug("[GalleryController] uploadGalleryImage", {
     title,
     category,
     caption,
+    thumbnailFit,
     fileName: req.file?.originalname,
     fileType: req.file?.mimetype,
   });
@@ -56,6 +58,7 @@ export const uploadGalleryImage = asyncHandler(async (req, res) => {
     imageMimeType: req.file.mimetype,
     imageFilename: req.file.originalname,
     imageSize: req.file.size,
+    thumbnailFit,
   });
 
   // Update URL to include the actual ID
@@ -137,6 +140,10 @@ export const updateGalleryImage = asyncHandler(async (req, res) => {
 
   if (typeof req.body.caption === "string") {
     payload.caption = req.body.caption.trim();
+  }
+
+  if (typeof req.body.thumbnailFit === "string") {
+    payload.thumbnailFit = req.body.thumbnailFit === "cover" ? "cover" : "contain";
   }
 
   if (req.file) {
